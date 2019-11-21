@@ -2,9 +2,13 @@
   <v-container class="pt-0" v-if="items.length > 0">
     <v-row class="list--item mb-md-8" v-for="item in items" :key="item.id">
       <v-col sm="12" md="4">
-        <v-img :src="item.image" contain class="list--img" v-if="item.image" />
+        <v-lazy v-if="item.image">
+          <v-img :src="item.image" contain class="list--img" />
+        </v-lazy>
         <div class="img--wrapper__default" v-else>
-          <v-img class="list--img list--img__default" src="@/assets/csesocwhiteblue.png" contain />
+          <v-lazy>
+            <v-img class="list--img list--img__default" src="@/assets/csesocwhiteblue.png" contain />
+          </v-lazy>
         </div>
       </v-col>
       <v-col>

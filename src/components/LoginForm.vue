@@ -77,9 +77,7 @@ export default {
     };
   },
   methods: {
-    login() {
-      console.log(`Hi ${this.zid}!`);
-    }
+    login() {}
   }
 };
 </script>

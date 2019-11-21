@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -67,23 +69,35 @@ func main() {
 	// Create new instance of echo
 	e := echo.New()
 
-	servePages(e)
-	serveAPI(e)
+	// Get flags
+	dbURI := flag.String("dburi", "mongodb://127.0.0.1:27017", "The mongodb instance URI in the form: mongodb://ip:port")
+	distPath := flag.String("dist", "../dist/",
+		"Path to the built app distribution (e.g. using yarn build --mode production)")
 
-	// Start echo instance on 1323 port
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.Gzip())
+
+	dbClient := setupDatabase(*dbURI)
+
+	servePages(e, *distPath)
+	serveAPI(e, dbClient)
+
 	e.Logger.Fatal(e.Start(":1323"))
 }
 
-func servePages(e *echo.Echo) {
+func servePages(e *echo.Echo, distPath string) {
+
 	// Setup our assetHandler and point it to our static build location
-	assetHandler := http.FileServer(http.Dir("../dist/"))
+	assetHandler := http.FileServer(http.Dir(distPath))
 
 	// Setup a new echo route to load the build as our base path
 	e.GET("/", echo.WrapHandler(assetHandler))
 
-	// Serve our static assists under the /static/ endpoint
+	e.GET("/favicon.ico", echo.WrapHandler(assetHandler))
 	e.GET("/js/*", echo.WrapHandler(assetHandler))
 	e.GET("/css/*", echo.WrapHandler(assetHandler))
+	e.GET("/img/*", echo.WrapHandler(assetHandler))
 
 	echo.NotFoundHandler = func(c echo.Context) error {
 		// render your 404 page
@@ -91,9 +105,9 @@ func servePages(e *echo.Echo) {
 	}
 }
 
-func serveAPI(e *echo.Echo) {
+func setupDatabase(dbURI string) *mongo.Client {
 	//Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	clientOptions := options.Client().ApplyURI(dbURI)
 	//Connect to MongoDB
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
@@ -105,18 +119,16 @@ func serveAPI(e *echo.Echo) {
 		log.Fatal(err)
 	}
 
-	println("Serving API...")
+	return client
+}
+
+func serveAPI(e *echo.Echo, dbClient *mongo.Client) {
 
 	// Creating collections
-	postsCollection := client.Database("csesoc").Collection("posts")
-	catCollection := client.Database("csesoc").Collection("categories")
-	sponsorCollection := client.Database("csesoc").Collection("sponsors")
-	// userCollection := client.Database("csesoc").Collection("users")
-
-	// Add more API routes here
-	e.GET("/api/v1/test", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
+	postsCollection := dbClient.Database("csesoc").Collection("posts")
+	catCollection := dbClient.Database("csesoc").Collection("categories")
+	sponsorCollection := dbClient.Database("csesoc").Collection("sponsors")
+	// userCollection := dbClient.Database("csesoc").Collection("users")
 
 	// e.POST("/login/", login(userCollection))
 
@@ -127,10 +139,11 @@ func serveAPI(e *echo.Echo) {
 	e.DELETE("/post/", deletePosts(postsCollection))
 
 	// Routes for categories
-	e.GET("/category/:id/", getCats(catCollection))
-	e.POST("/category/", newCats(catCollection))
-	e.PATCH("/category/", patchCats(catCollection))
-	e.DELETE("/category/", deleteCats(catCollection))
+	e.GET("/category/:id/", getCategories(catCollection))
+	e.GET("/category/", getAllCategories(catCollection))
+	e.POST("/category/", newCategories(catCollection))
+	e.PATCH("/category/", patchCategories(catCollection))
+	e.DELETE("/category/", deleteCategories(catCollection))
 
 	// Routes for sponsors
 	e.POST("/sponsor/", newSponsors(sponsorCollection))
@@ -209,44 +222,72 @@ func deletePosts(collection *mongo.Collection) echo.HandlerFunc {
 	}
 }
 
-func getCats(collection *mongo.Collection) echo.HandlerFunc {
+func getAllCategories(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
-		id, _ := strconv.Atoi(c.QueryParam("id"))
-		result := GetCats(collection, id, token)
+		count, err := strconv.Atoi(c.QueryParam("count"))
+
+		result, err := GetAllCategories(collection, count, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't get all categories",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{
-			"category": result,
+			"categories": result,
 		})
 	}
 }
 
-func newCats(collection *mongo.Collection) echo.HandlerFunc {
+func getCategories(collection *mongo.Collection) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := c.FormValue("token")
+		id, _ := strconv.Atoi(c.QueryParam("id"))
+
+		result, err := GetCategories(collection, id, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't get a category by ID",
+			})
+		}
+
+		return c.JSON(http.StatusOK, H{
+			"category": result,
+		})
+
+	}
+}
+
+func newCategories(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
 		catID, _ := strconv.Atoi(c.FormValue("id"))
 		index, _ := strconv.Atoi(c.FormValue("index"))
 		name := c.FormValue("name")
-		NewCats(collection, catID, index, name, token)
+		NewCategories(collection, catID, index, name, token)
 		return c.JSON(http.StatusOK, H{})
 	}
 }
 
-func patchCats(collection *mongo.Collection) echo.HandlerFunc {
+func patchCategories(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
 		catID, _ := strconv.Atoi(c.FormValue("id"))
 		name := c.FormValue("name")
 		index, _ := strconv.Atoi(c.FormValue("index"))
-		PatchCats(collection, catID, name, index, token)
+		PatchCategories(collection, catID, name, index, token)
 		return c.JSON(http.StatusOK, H{})
 	}
 }
 
-func deleteCats(collection *mongo.Collection) echo.HandlerFunc {
+func deleteCategories(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
 		id, _ := strconv.Atoi(c.FormValue("id"))
-		DeleteCats(collection, id, token)
+		DeleteCategories(collection, id, token)
 		return c.JSON(http.StatusOK, H{})
 	}
 }

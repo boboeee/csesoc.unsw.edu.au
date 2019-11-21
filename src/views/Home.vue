@@ -12,13 +12,21 @@
       />
       <v-img v-else max-width="80vw" max-height="30vh" contain src="@/assets/csesocwhiteblue.png" />
       <a
+        role="button"
         href="https://www.arc.unsw.edu.au/clubs"
         target="_blank"
+        rel="noopener"
         v-ripple
-        class="button"
+        class="button white--text font-weight-bold"
       >Join on spArc</a>
       <br />
-      <v-btn text icon color="white" @click="scrollto('content-start')">
+      <v-btn
+        aria-label="Scroll to content"
+        text
+        icon
+        color="white"
+        @click="scrollto('content-start')"
+      >
         <v-icon>mdi-chevron-down</v-icon>
       </v-btn>
     </header>
@@ -59,12 +67,14 @@
 </template>
 
 <script>
+import Scroll from '@/components/ScrollTo';
 import NavGrid from '@/components/NavGrid';
 import ListComponent from '@/components/ListComponent';
 import Slider from '@/components/Slider';
 import HeaderTitle from '@/components/HeaderTitle';
 
 export default {
+  mixins: [Scroll],
   data: () => ({
     drawer: false,
     resourcesApiUrl:
@@ -104,13 +114,6 @@ export default {
       .then((responseJson) => {
         this.announceItems = responseJson;
       });
-  },
-  methods: {
-    scrollto(anchor) {
-      const element = this.$refs[anchor];
-      const top = element.offsetTop;
-      window.scrollTo({ top, behavior: 'smooth' });
-    }
   }
 };
 </script>

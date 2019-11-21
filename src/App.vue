@@ -3,9 +3,13 @@
     <!-- Navigation bar/app bar goes here -->
     <v-content>
       <div>
-        <Sidebar :drawer="drawer" />
+        <Sidebar ref="sidebar" />
         <v-app-bar app dark width="100vw">
-          <v-app-bar-nav-icon class="ma-2" @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
+          <v-app-bar-nav-icon
+            aria-label="Toggle sidebar menu"
+            class="ma-2"
+            @click.stop="toggleDrawer()"
+          ></v-app-bar-nav-icon>
           <div class="flex-grow-1"></div>
           <router-link to="/">
             <v-container class="fill-height" fluid style="max-height: 64px; max-width:100px">
@@ -30,14 +34,15 @@ import LoginForm from '@/components/LoginForm';
 
 export default {
   name: 'App',
-  data: () => ({
-    drawer: false
-  }),
-
   components: {
     Footer,
     Sidebar,
     LoginForm
+  },
+  methods: {
+    toggleDrawer() {
+      this.$refs.sidebar.$data.isOpen = !this.$refs.sidebar.$data.isOpen;
+    }
   }
 };
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <v-navigation-drawer v-model="drawer" app class="sidebar">
+  <v-navigation-drawer v-model="isOpen" app class="sidebar">
     <v-container fluid>
       <v-row align="center" justify="center">
         <div class="search">
@@ -9,7 +9,6 @@
           </v-list-item-action>
         </div>
       </v-row>
-
       <v-divider></v-divider>
     </v-container>
 
@@ -35,9 +34,6 @@
 </template>
 
 <style scoped>
-.sidebar {
-  font-family: "Quicksand", sans-serif;
-}
 </style>
 
 <script>
@@ -120,16 +116,12 @@ export default {
         }
       ],
       search: { filter: null, text: '' },
-      searchIcon: 'mdi-magnify'
+      searchIcon: 'mdi-magnify',
+      isOpen: false
     };
   },
-  props: {
-    drawer: Boolean
-  },
   methods: {
-    search_text() {
-      console.log('typing...');
-    }
+    search_text() {}
   }
 };
 </script>

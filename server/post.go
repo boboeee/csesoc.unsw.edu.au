@@ -27,10 +27,10 @@ func GetPosts(collection *mongo.Collection, id int, category string) Post {
 // GetAllPosts - Retrieve all posts
 func GetAllPosts(collection *mongo.Collection, count int, cat string) []*Post {
 	findOptions := options.Find()
-	if count != 10 {
+	if count < 50 {
 		findOptions.SetLimit(int64(count))
 	} else {
-		findOptions.SetLimit(10)
+		findOptions.SetLimit(50)
 	}
 
 	var posts []*Post
