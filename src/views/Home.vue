@@ -80,8 +80,7 @@ export default {
     resourcesApiUrl:
       'https://gist.githack.com/gawdn/6fb68af4e994dd72e50fb360d299cbb6/raw/6fa351ba05f90ce0906c4c7accdf8c712f28f60d/resources0b.json',
     resourcesItems: [],
-    announceApiUri:
-      'https://gist.githack.com/gawdn/79b9df83f2fd267a3287d13b9badce48/raw/7bfb85a4cb799712229bed5ea02234e773eb42d4/populated_list.json',
+    announceApiUri: '/api/v1/posts',
     announceItems: [],
     mediaApiUri:
       'https://gist.githack.com/gawdn/a590d5be689e3ffbee15c213928e3b4b/raw/bed82e02b6a4d01196a4390e1a8b12ccf5b377fa/media0a.json',
@@ -112,7 +111,16 @@ export default {
     fetch(this.announceApiUri)
       .then(r => r.json())
       .then((responseJson) => {
-        this.announceItems = responseJson;
+        responseJson.posts.forEach((post) => {
+          this.announceItems.push({
+            id: post.PostId,
+            image: post.ImageLink,
+            title: post.Title,
+            subtitle: post.PostSubtitle,
+            content: post.PostContent,
+            link: post.resourcelink
+          });
+        });
       });
   }
 };

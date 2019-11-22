@@ -8,7 +8,6 @@
           target="_blank"
           rel="noopener"
         >
-          >
           <v-lazy>
             <v-img
               :src="item.src"

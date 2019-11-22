@@ -21,17 +21,18 @@ type H map[string]interface{}
 
 // Post - struct to contain post data
 type Post struct {
-	PostID           int
-	PostTitle        string
-	PostSubtitle     string
-	PostType         string
-	PostCategory     int
-	CreatedOn        int64
-	LastEditedOn     int64
-	PostContent      string
-	PostLinkGithub   string
-	PostLinkFacebook string
-	ShowInMenu       bool
+	PostID        int
+	PostTitle     string
+	PostSubtitle  string
+	PostType      string
+	PostCategory  int
+	CreatedOn     int64
+	LastEditedOn  int64
+	PostContent   string
+	CanonicalLink string
+	ImageLink     string
+	ResourceLink  string
+	ShowInMenu    bool
 }
 
 // Category - struct to contain category data
@@ -54,6 +55,7 @@ type Sponsor struct {
 	SponsorName string
 	SponsorLogo string
 	SponsorTier string
+	SponsorLink string
 	Expiry      int64
 }
 
@@ -83,7 +85,7 @@ func main() {
 	servePages(e, *distPath)
 	serveAPI(e, dbClient)
 
-	e.Logger.Fatal(e.Start(":1323"))
+	e.Logger.Fatal(e.Start(":80"))
 }
 
 func servePages(e *echo.Echo, distPath string) {
@@ -130,24 +132,29 @@ func serveAPI(e *echo.Echo, dbClient *mongo.Client) {
 	sponsorCollection := dbClient.Database("csesoc").Collection("sponsors")
 	// userCollection := dbClient.Database("csesoc").Collection("users")
 
-	// e.POST("/login/", login(userCollection))
+	// Create a new API subroute
+	apiRoute := e.Group("/api/v1/")
+
+	// apiRoute.POST("/login/", login(userCollection))
 
 	// Routes for posts
-	e.GET("/posts/", getPosts(postsCollection))
-	e.POST("/post/", newPosts(postsCollection))
-	e.PUT("/post/", updatePosts(postsCollection))
-	e.DELETE("/post/", deletePosts(postsCollection))
+	apiRoute.GET("posts", getPosts(postsCollection))
+	apiRoute.POST("post", newPosts(postsCollection))
+	apiRoute.PUT("post", updatePosts(postsCollection))
+	apiRoute.DELETE("post", deletePosts(postsCollection))
 
 	// Routes for categories
-	e.GET("/category/:id/", getCategories(catCollection))
-	e.GET("/category/", getAllCategories(catCollection))
-	e.POST("/category/", newCategories(catCollection))
-	e.PATCH("/category/", patchCategories(catCollection))
-	e.DELETE("/category/", deleteCategories(catCollection))
+	apiRoute.GET("category/:id", getCategories(catCollection))
+	apiRoute.GET("category", getAllCategories(catCollection))
+	apiRoute.POST("category", newCategories(catCollection))
+	apiRoute.PATCH("category", patchCategories(catCollection))
+	apiRoute.DELETE("category", deleteCategories(catCollection))
 
 	// Routes for sponsors
-	e.POST("/sponsor/", newSponsors(sponsorCollection))
-	e.DELETE("/sponsor/", deleteSponsors(sponsorCollection))
+	apiRoute.GET("sponsor", getAllSponsors(sponsorCollection))
+	apiRoute.POST("sponsor", newSponsors(sponsorCollection))
+	apiRoute.DELETE("sponsor", deleteSponsors(sponsorCollection))
+
 }
 
 // func login(collection *mongo.Collection) echo.HandlerFunc {
@@ -166,16 +173,31 @@ func getPosts(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.QueryParam("id")
 		count, _ := strconv.Atoi(c.QueryParam("nPosts"))
-		category := c.QueryParam("category")
+		category, _ := strconv.Atoi(c.QueryParam("category"))
+
 		if id == "" {
-			posts := GetAllPosts(collection, count, category)
+			posts, err := GetAllPosts(collection, count, category)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, H{
+					"error": "Couldn't get all posts",
+				})
+			}
+
 			return c.JSON(http.StatusOK, H{
-				"post": posts,
+				"posts": posts,
 			})
+
 		}
 
 		idInt, _ := strconv.Atoi(id)
-		result := GetPosts(collection, idInt, category)
+		result, err := GetPosts(collection, idInt, category)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't get post with that ID",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{
 			"post": result,
 		})
@@ -191,9 +213,16 @@ func newPosts(collection *mongo.Collection) echo.HandlerFunc {
 		subtitle := c.FormValue("subtitle")
 		postType := c.FormValue("type")
 		content := c.FormValue("content")
-		github := c.FormValue("linkGithub")
-		fb := c.FormValue("linkFacebook")
-		NewPosts(collection, id, category, showInMenu, title, subtitle, postType, content, github, fb)
+		imageLink := c.FormValue("imageLink")
+		resourceLink := c.FormValue("resourceLink")
+		canonicalLink := c.FormValue("canonicalLink")
+		err := NewPosts(collection, id, category, showInMenu, title, subtitle, postType, content, imageLink, resourceLink, canonicalLink)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't create that post with the given data",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -207,9 +236,16 @@ func updatePosts(collection *mongo.Collection) echo.HandlerFunc {
 		subtitle := c.FormValue("subtitle")
 		postType := c.FormValue("type")
 		content := c.FormValue("content")
-		github := c.FormValue("linkGithub")
-		fb := c.FormValue("linkFacebook")
-		UpdatePosts(collection, id, category, showInMenu, title, subtitle, postType, content, github, fb)
+		imageLink := c.FormValue("imageLink")
+		resourceLink := c.FormValue("resourceLink")
+		canonicalLink := c.FormValue("canonicalLink")
+		err := UpdatePosts(collection, id, category, showInMenu, title, subtitle, postType, content, imageLink, resourceLink, canonicalLink)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't update that post with the given data",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -217,7 +253,13 @@ func updatePosts(collection *mongo.Collection) echo.HandlerFunc {
 func deletePosts(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id, _ := strconv.Atoi(c.FormValue("id"))
-		DeletePosts(collection, id)
+		err := DeletePosts(collection, id)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't delete that post",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -267,7 +309,14 @@ func newCategories(collection *mongo.Collection) echo.HandlerFunc {
 		catID, _ := strconv.Atoi(c.FormValue("id"))
 		index, _ := strconv.Atoi(c.FormValue("index"))
 		name := c.FormValue("name")
-		NewCategories(collection, catID, index, name, token)
+		err := NewCategories(collection, catID, index, name, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't create that category with the given data",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -278,7 +327,14 @@ func patchCategories(collection *mongo.Collection) echo.HandlerFunc {
 		catID, _ := strconv.Atoi(c.FormValue("id"))
 		name := c.FormValue("name")
 		index, _ := strconv.Atoi(c.FormValue("index"))
-		PatchCategories(collection, catID, name, index, token)
+		err := PatchCategories(collection, catID, name, index, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't edit that category with the given data",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -287,8 +343,33 @@ func deleteCategories(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
 		id, _ := strconv.Atoi(c.FormValue("id"))
-		DeleteCategories(collection, id, token)
+		err := DeleteCategories(collection, id, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't delete that category",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
+	}
+}
+
+func getAllSponsors(collection *mongo.Collection) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		count, _ := strconv.Atoi(c.QueryParam("count"))
+		result, err := GetAllSponsors(collection, count)
+
+		if err != nil {
+			log.Println(err)
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't get all sponsors",
+			})
+		}
+
+		return c.JSON(http.StatusOK, H{
+			"sponsors": result,
+		})
 	}
 }
 
@@ -299,7 +380,16 @@ func newSponsors(collection *mongo.Collection) echo.HandlerFunc {
 		name := c.FormValue("name")
 		logo := c.FormValue("logo")
 		tier := c.FormValue("tier")
-		NewSponsors(collection, expiryStr, name, logo, tier, token)
+		link := c.FormValue("link")
+
+		err := NewSponsors(collection, expiryStr, name, logo, tier, link, token)
+
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't create a sponsor with those details",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }
@@ -308,7 +398,13 @@ func deleteSponsors(collection *mongo.Collection) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.FormValue("token")
 		id := c.FormValue("id")
-		DeleteSponsors(collection, id, token)
+		err := DeleteSponsors(collection, id, token)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, H{
+				"error": "Couldn't delete that sponsor",
+			})
+		}
+
 		return c.JSON(http.StatusOK, H{})
 	}
 }

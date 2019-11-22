@@ -3,21 +3,42 @@
     <v-card id="tiers__sponsors" width="100vw" class="white--text text-center">
       <v-card-text class="white--text">
         <section class="tiers__grid">
-          <a v-for="sponsor in tierOne" class="tiers__box" :href="sponsor.link" :key="sponsor.id">
+          <a
+            v-for="sponsor in tierOne"
+            class="tiers__box"
+            :href="sponsor.link"
+            target="_blank"
+            rel="noopener"
+            :key="sponsor.id"
+          >
             <v-lazy>
               <img :src="sponsor.logo" style=" max-width:300px;max-height:105px;" />
             </v-lazy>
           </a>
         </section>
         <section class="tiers__grid">
-          <a v-for="sponsor in tierTwo" class="tiers__box" :href="sponsor.link" :key="sponsor.id">
+          <a
+            v-for="sponsor in tierTwo"
+            class="tiers__box"
+            :href="sponsor.link"
+            target="_blank"
+            rel="noopener"
+            :key="sponsor.id"
+          >
             <v-lazy>
               <img :src="sponsor.logo" style="max-width:200px;max-height:75px" />
             </v-lazy>
           </a>
         </section>
         <section class="tiers__grid">
-          <a v-for="sponsor in tierThree" class="tiers__box" :href="sponsor.link" :key="sponsor.id">
+          <a
+            v-for="sponsor in tierThree"
+            class="tiers__box"
+            :href="sponsor.link"
+            target="_blank"
+            rel="noopener"
+            :key="sponsor.id"
+          >
             <v-lazy>
               <img :src="sponsor.logo" style="max-width:100px;max-height:50px" />
             </v-lazy>
@@ -110,12 +131,22 @@ export default {
     }
   },
   mounted() {
-    fetch(
-      'https://gistcdn.githack.com/esyw/4e35cd5fe73fa024020e67855ca733fb/raw/e85c9ae58a6323a4214ffa4ad89b0a5ebe404e31/sponsors.json'
-    )
+    fetch('/api/v1/sponsor')
       .then(r => r.json())
       .then((responseJson) => {
-        this.sponsors = responseJson;
+        if (responseJson.sponsors != null) {
+          responseJson.sponsors.forEach((sponsor) => {
+            this.sponsors.push({
+              id: sponsor.SponsorId,
+              logo: sponsor.SponsorLogo,
+              name: sponsor.SponsorName,
+              tier: sponsor.SponsorTier,
+              link: sponsor.SponsorLink
+            });
+          });
+        } else {
+          this.sponsors = [];
+        }
       });
   }
 };
